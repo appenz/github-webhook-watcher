@@ -1,0 +1,22 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "intra_deploy"
+version = "0.1.0"
+authors = [
+  { name = "Guido Appenzeller" },
+]
+description = "Intra Deploy Project"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "svix",
+]
+
+[tool.pytest.ini_options]
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
