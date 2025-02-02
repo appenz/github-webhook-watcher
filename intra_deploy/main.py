@@ -6,7 +6,9 @@ import os
 from pathlib import Path
 from typing import Any
 
+from svix.api import Svix, SvixAsync
 from svix.webhooks import Webhook, WebhookVerificationError
+import asyncio
 
 def setup_logging() -> None:
     """Configure logging to write to ~/Library/Logs/intra-deploy/intra-deploy.log."""
@@ -52,25 +54,53 @@ def verify_webhook(
         logging.error(f"Webhook verification failed: {e}")
         raise
 
-def main() -> None:
-    """Main entry point for the webhook watcher."""
+async def listen_for_messages(svix: SvixAsync, logger: logging.Logger) -> None:
+    """Listen for messages from Svix message queue.
+    
+    Args:
+        svix: Initialized Svix client
+        logger: Logger instance for output
+    """
+    try:
+        async for msg in svix.message.listen_to_app_messages():
+            try:
+                # Process the message payload
+                payload = msg.payload
+                logger.info(f"Received message: {msg.event_type}")
+                process_webhook_payload(payload)
+            except Exception as e:
+                logger.error(f"Error processing message: {e}")
+    except Exception as e:
+        logger.error(f"Error in message listener: {e}")
+        raise
+
+async def async_main() -> None:
+    """Async main entry point for the webhook watcher."""
     setup_logging()
     logger = logging.getLogger(__name__)
     
     # Get configuration from environment
-    webhook_url = os.getenv("WEBHOOK_URL")
-    webhook_secret = os.getenv("WEBHOOK_SECRET")
+    svix_api_key = os.getenv("SVIX_API_KEY")
     
-    if not webhook_url or not webhook_secret:
-        logger.error("WEBHOOK_URL and WEBHOOK_SECRET must be set in environment")
+    if not svix_api_key:
+        logger.error("SVIX_API_KEY must be set in environment")
         return
     
-    logger.info(f"Starting webhook watcher for URL: {webhook_url}")
+    logger.info("Starting Svix message listener")
     
-    # TODO: Implement webhook listening using svix
-    # This would typically involve setting up a server to listen for webhook requests
-    # For now, this is a placeholder as the exact implementation depends on how
-    # we want to handle the incoming webhooks (e.g., using FastAPI, Flask, etc.)
+    # Initialize Svix client
+    svix = SvixAsync(svix_api_key)
     
+    try:
+        await listen_for_messages(svix, logger)
+    except KeyboardInterrupt:
+        logger.info("Shutting down...")
+    finally:
+        await svix.close()
+
+def main() -> None:
+    """Main entry point that runs the async loop."""
+    asyncio.run(async_main())
+
 if __name__ == "__main__":
     main()
