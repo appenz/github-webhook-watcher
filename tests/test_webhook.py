@@ -6,20 +6,22 @@ from unittest.mock import patch
 import pytest
 from svix.webhooks import WebhookVerificationError
 
-from intra_deploy.main import process_webhook_payload, verify_webhook
+from webhookclient.main import process_webhook_payload, verify_webhook
 
 def test_process_webhook_payload_master_push():
     """Test that a push to master triggers deploy."""
     payload = {"ref": "refs/heads/master"}
-    with patch("intra_deploy.main.deploy") as mock_deploy:
-        process_webhook_payload(payload)
+    headers = {"x-github-event": "push"}
+    with patch("webhookclient.main.deploy") as mock_deploy:
+        process_webhook_payload(payload, headers)
         mock_deploy.assert_called_once()
 
 def test_process_webhook_payload_other_branch():
     """Test that a push to another branch doesn't trigger deploy."""
     payload = {"ref": "refs/heads/feature"}
-    with patch("intra_deploy.main.deploy") as mock_deploy:
-        process_webhook_payload(payload)
+    headers = {"x-github-event": "push"}
+    with patch("webhookclient.main.deploy") as mock_deploy:
+        process_webhook_payload(payload, headers)
         mock_deploy.assert_not_called()
 
 def test_verify_webhook_valid():
