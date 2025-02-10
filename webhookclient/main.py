@@ -13,10 +13,10 @@ import aiohttp
 from svix.webhooks import Webhook, WebhookVerificationError
 
 def setup_logging() -> None:
-    """Configure logging to write to ~/Library/Logs/intra-deploy/intra-deploy.log."""
-    log_dir = Path.home() / "Library/Logs/intra-deploy"
+    """Configure logging to write to ~/Library/Logs/webhook_client.log."""
+    log_dir = Path.home() / "Library/Logs"
     log_dir.mkdir(parents=True, exist_ok=True)
-    log_file = log_dir / "intra-deploy.log"
+    log_file = log_dir / "webhook_client.log"
     
     logging.basicConfig(
         level=logging.INFO,
@@ -167,15 +167,24 @@ def main() -> None:
     if not endpoint_url or not api_key:
         logger.error("SVIX_ENDPOINT_URL and SVIX_API_KEY must be set in environment")
         return
+
+    # Get optional polling interval
+    try:
+        poll_interval = int(os.getenv("SVIX_POLLING_INTERVAL", "30"))
+        if poll_interval <= 0:
+            raise ValueError("Polling interval must be positive")
+    except ValueError as e:
+        logger.error(f"Invalid SVIX_POLLING_INTERVAL: {e}")
+        return
     
-    logger.info(f"Starting Svix poller for endpoint: {endpoint_url}")
+    logger.info(f"Starting Svix poller for endpoint: {endpoint_url} with {poll_interval}s interval")
     
     # Setup signal handlers for graceful shutdown
     signal.signal(signal.SIGINT, handle_shutdown)
     signal.signal(signal.SIGTERM, handle_shutdown)
     
     try:
-        asyncio.run(run_poller(endpoint_url, api_key, logger))
+        asyncio.run(run_poller(endpoint_url, api_key, logger, poll_interval=poll_interval))
     except KeyboardInterrupt:
         logger.info("Shutting down...")
     except Exception as e:
