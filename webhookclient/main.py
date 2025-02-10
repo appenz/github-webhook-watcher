@@ -4,6 +4,7 @@ import logging
 import os
 import signal
 import sys
+import subprocess
 from pathlib import Path
 from typing import Any, Optional
 
@@ -26,8 +27,73 @@ def setup_logging() -> None:
     )
 
 def deploy() -> None:
-    """Empty deploy function to be implemented later."""
-    logging.info("Deploy function called (empty implementation)")
+    """Deploy a GitHub repository locally.
+    
+    This function either clones a new repository or pulls the latest changes
+    for an existing repository. It uses the following environment variables:
+    - GITHUB_REPO: The GitHub repository to deploy (e.g. 'appenz/github-webhook-watcher')
+    - LOCAL_DIRECTORY: The local directory to deploy to (default: ~/dev)
+    
+    The function preserves local files (like .env) during pulls.
+    
+    Raises:
+        RuntimeError: If GITHUB_REPO is not set or if git operations fail
+    """
+    logger = logging.getLogger(__name__)
+    
+    # Get required environment variables
+    github_repo = os.getenv("GITHUB_REPO")
+    if not github_repo:
+        msg = "GITHUB_REPO environment variable must be set"
+        logger.error(msg)
+        raise RuntimeError(msg)
+        
+    # Get local directory from environment or use default
+    local_base = os.getenv("LOCAL_DIRECTORY")
+    if not local_base:
+        local_base = str(Path.home() / "dev")
+    
+    # Create base directory if it doesn't exist
+    base_path = Path(local_base).expanduser()
+    base_path.mkdir(parents=True, exist_ok=True)
+    
+    # Extract repo name from full repo path (e.g. 'appenz/github-webhook-watcher' -> 'github-webhook-watcher')
+    repo_name = github_repo.split('/')[-1]
+    repo_path = base_path / repo_name
+    repo_url = f"https://github.com/{github_repo}.git"
+    
+    try:
+        if not repo_path.exists():
+            # Clone the repository if it doesn't exist
+            logger.info(f"Cloning repository {github_repo} to {repo_path}")
+            result = subprocess.run(
+                ["git", "clone", repo_url],
+                cwd=str(base_path),
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Clone successful: {result.stdout.strip()}")
+        else:
+            # Pull latest changes if repository exists
+            logger.info(f"Pulling latest changes for {github_repo} in {repo_path}")
+            result = subprocess.run(
+                ["git", "pull", "origin"],
+                cwd=str(repo_path),
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            logger.info(f"Pull successful: {result.stdout.strip()}")
+            
+    except subprocess.CalledProcessError as e:
+        error_msg = f"Git operation failed: {e.stderr.strip()}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
+    except Exception as e:
+        error_msg = f"Unexpected error during deploy: {str(e)}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg) from e
 
 def process_webhook_payload(payload: dict[str, Any], headers: dict[str, Any]) -> None:
     """Process the GitHub webhook payload and trigger deploy if needed."""
