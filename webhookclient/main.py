@@ -31,17 +31,22 @@ def deploy() -> None:
     """Empty deploy function to be implemented later."""
     logging.info("Deploy function called (empty implementation)")
 
-def process_webhook_payload(payload: dict[str, Any]) -> None:
+def process_webhook_payload(payload: dict[str, Any], headers: dict[str, Any]) -> None:
     """Process the GitHub webhook payload and trigger deploy if needed."""
-    # Check if this is a push to master/main branch
-    if (
-        payload.get("ref") == "refs/heads/master" 
-        or payload.get("ref") == "refs/heads/main"
-    ):
-        logging.info("Push to master/main branch detected, triggering deploy")
+
+    # Insert custom logic here.
+
+    event = headers.get("x-github-event")
+    repo = payload.get("repository", {}).get("full_name")
+    branch = payload.get("ref")
+
+    print(f"Received event: {event} for repo: {repo} on branch: {branch}")
+
+    # In case of a push to main or master branch, trigger a deploy.
+    if event == "push" and (branch == "refs/heads/master" or branch == "refs/heads/main"):
+        logging.info(f"Push to master detected, triggering deploy.")
         deploy()
-    else:
-        logging.info(f"Ignoring push to {payload.get('ref')}")
+ 
 
 def verify_webhook(
     payload: bytes, 
@@ -92,6 +97,8 @@ async def poll_messages(
                 return [], "", True
                 
             data = await response.json()
+            # Parse json data and print it
+            #print(json.dumps(data, indent=4))
             return data.get("data", []), data.get("iterator", ""), data.get("done", True)
             
     except Exception as e:
@@ -111,8 +118,9 @@ async def process_messages(
     for msg in messages:
         try:
             payload = msg.get("payload", {})
+            headers = msg.get("headers", {})
             logger.info(f"Processing message: {msg.get('id')}")
-            process_webhook_payload(payload)
+            process_webhook_payload(payload, headers)
         except Exception as e:
             logger.error(f"Error processing message {msg.get('id')}: {e}")
 
@@ -134,19 +142,11 @@ async def run_poller(
     
     async with aiohttp.ClientSession() as session:
         while True:
-            messages, next_iterator, done = await poll_messages(
-                session, endpoint_url, api_key, logger, iterator
-            )
-            
+            messages, next_iterator, done = await poll_messages(session, endpoint_url, api_key, logger, iterator)
             if messages:
                 await process_messages(messages, logger)
                 
-            if not done and next_iterator:
-                iterator = next_iterator
-            else:
-                # Reset iterator to get new messages in next poll
-                iterator = None
-                
+            iterator = next_iterator    
             await asyncio.sleep(poll_interval)
 
 def handle_shutdown(signum: int, frame: Any) -> None:
