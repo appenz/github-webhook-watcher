@@ -1,5 +1,3 @@
-"""Main entry point for intra-deploy webhook watcher."""
-
 import asyncio
 import json
 import logging
@@ -91,7 +89,7 @@ async def poll_messages(
         url = f"{endpoint_url}?iterator={iterator}"
         
     try:
-        async with session.get(url, headers=headers) as response:
+        async with await session.get(url, headers=headers) as response:
             if response.status != 200:
                 logger.error(f"Failed to poll messages: {response.status}")
                 return [], "", True

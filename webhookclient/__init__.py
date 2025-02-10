@@ -1,5 +1,5 @@
 """
-Intra Deploy package.
+GitHub webhooks with Svix.
 """
 
 from .main import main

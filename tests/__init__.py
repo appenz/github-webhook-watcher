@@ -1,3 +1,1 @@
-"""
-Test suite for intra_deploy package.
-"""
+# empty file to make tests a package
