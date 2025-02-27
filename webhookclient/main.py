@@ -61,15 +61,39 @@ def update_local() -> None:
             logger.info(f"Clone successful: {result.stdout.strip()}")
         else:
             # Pull latest changes if repository exists
-            logger.info(f"Pulling latest changes for {github_repo} in {repo_path}")
-            result = subprocess.run(
-                ["git", "pull", "origin"],
+            logger.info(f"Updating {github_repo} in {repo_path}")
+            
+            # First fetch the latest changes
+            subprocess.run(
+                ["git", "fetch", "origin"],
                 cwd=str(repo_path),
                 capture_output=True,
                 text=True,
                 check=True
             )
-            logger.info(f"Pull successful: {result.stdout.strip()}")
+            
+            # Then reset to match the remote branch
+            try:
+                # Get current branch
+                current_branch = subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    cwd=str(repo_path),
+                    universal_newlines=True
+                ).strip()
+                
+                # Reset to match the remote branch but keep untracked files
+                reset_cmd = ["git", "reset", "--hard", f"origin/{current_branch}"]
+                result = subprocess.run(
+                    reset_cmd,
+                    cwd=str(repo_path),
+                    capture_output=True,
+                    text=True,
+                    check=True
+                )
+                logger.info(f"Update successful: {result.stdout.strip()}")
+            except subprocess.CalledProcessError as e:
+                logger.error(f"Git reset failed: {e.stderr.strip()}")
+                raise
             
     except subprocess.CalledProcessError as e:
         error_msg = f"Git operation failed: {e.stderr.strip()}"
