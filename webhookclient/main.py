@@ -456,6 +456,31 @@ def check_and_restart_if_needed() -> None:
     else:
         logger.info("Project health check: running")
 
+def update_repository():
+    """
+    Update the repository by fetching latest changes and resetting to match remote.
+    This overwrites local changes but preserves untracked files.
+    """
+    try:
+        # Get current branch
+        current_branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            universal_newlines=True
+        ).strip()
+        
+        # Fetch the latest changes
+        subprocess.run(["git", "fetch"], check=True)
+        
+        # Reset to match the remote branch but keep untracked files
+        reset_cmd = ["git", "reset", "--hard", f"origin/{current_branch}"]
+        subprocess.run(reset_cmd, check=True)
+        
+        print(f"Repository updated successfully, local changes overwritten, untracked files preserved.")
+        return True
+    except subprocess.SubprocessError as e:
+        print(f"Error updating repository: {e}")
+        return False
+
 def main() -> None:
     """Main entry point for the webhook watcher."""
     setup_logging()
@@ -466,6 +491,8 @@ def main() -> None:
     
     # Handle install/uninstall options first
     if args.install:
+        # Update repository before installation
+        update_repository()
         install_launch_agent()
         return
     
