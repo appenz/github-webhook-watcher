@@ -385,6 +385,8 @@ def start_project() -> None:
     github_repo = os.getenv("GITHUB_REPO")
     run_command = os.getenv("RUNCOMMAND")
     grep_command = os.getenv("GREPCOMMAND")
+    additional_path = os.getenv("ADDITIONAL_PATH")
+    
     project_name = github_repo.split('/')[-1]
     
     # Get local directory from environment or use default
@@ -406,13 +408,17 @@ def start_project() -> None:
         
         # Start the process in the background, redirecting output to log file
         with open(log_file, "a") as f:
+            env = os.environ.copy()
+            if additional_path:
+                env["PATH"] = f"{additional_path}:{env['PATH']}"
             process = subprocess.Popen(
                 run_command,
                 shell=True,
                 cwd=str(project_path),
                 stdout=f,
                 stderr=subprocess.STDOUT,
-                start_new_session=True  # This creates a new process group
+                start_new_session=True,  # This creates a new process group
+                env=env
             )
         
         logger.info(f"Project started with PID {process.pid}, logs at {log_file}")
